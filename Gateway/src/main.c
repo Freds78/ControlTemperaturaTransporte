@@ -1,29 +1,32 @@
 /*
  * main.c
  *
- *  Created on: 28 abr. 2020
+ *  Created on: 13 ene. 2021
  *      Author: freds
  */
 
-/*=====[Main function, program entry point after power on or reset]==========*/
-#include "sensorTemp.h"
-#include "sapi.h"       // <= sAPI header
+#include "sapi.h"
+#include "Control_data.h"
+#include "Record.h"
 #include "ff.h"       // <= Biblioteca FAT FS
 #include "fssdc.h"	// API de bajo nivel para unidad "SDC:" en FAT FS
-#include "sendData.h"
 
 
 int main( void )
 {
    // ----- Setup -----------------------------------
    boardInit();
-   uartConfig( UART_USB, 115200 );
+   /* Inicializar la UART_USB junto con las interrupciones de Tx y Rx */
+   uartConfig(UART_GPIO, 9600);
+   uartConfig(UART_USB, 115200);
    uartConfig( UART_232, 115200 );
-   /* Configurar PWM */
-   pwmConfig( 0, PWM_ENABLE );
-   pwmConfig( PWM0, PWM_ENABLE_OUTPUT );
 
+   // Seteo un callback al evento de recepcion y habilito su interrupcion
+   uartCallbackSet(UART_232, UART_RECEIVE, onRx, NULL);
 
+   // Habilito todas las interrupciones de UART_USB
+   uartInterrupt(UART_232, true);
+/**/
    // SPI configuration
    spiConfig( SPI0 );
 
@@ -42,15 +45,18 @@ int main( void )
 
    rtcInit(); // Inicializar RTC
 
-   conection_t com;
-   sensorInit(&com);
 
+   package_t gprs;
 
+   Control_init(&gprs);
 
    // ----- Repeat for ever -------------------------
-   while( TRUE ) {
+   while( true ) {
 
-		masterTx_Control(&com);
+	  //gpioToggle(LEDB);
+	  //delay(500);
+      Control_data(&gprs);
+
    }
 
    // YOU NEVER REACH HERE, because this program runs directly or on a
@@ -58,6 +64,5 @@ int main( void )
    // case of a PC program.
    return 0;
 }
-
 
 
