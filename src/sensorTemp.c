@@ -11,25 +11,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
+
+#include "Memory.h"
 #include "sendData.h"
-#include "Record.h"
 
 /*=====[Definition macros of private constants]==============================*/
 
-#define AMARILLO LED1
-#define ROJO LED2
-#define VERDE LED3
-#define SKIP_ROMCOM 0xCC
-#define CONVERT_TEMP 0x44
-#define READ_SCRATCH 0xBE
-#define SEARCH_ROM 0xF0
-#define MATCH_ROM 0x55
-#define VALUE_LOW_S1 15
-#define VALUE_HIGH_S1 20
-#define VALUE_LOW_S2 12
-#define VALUE_HIGH_S2 25
-#define VALUE_LOW_S3 10
-#define VALUE_HIGH_S3 28
+
 
 /*=====[Definitions of extern global variables]==============================*/
 
@@ -588,7 +576,7 @@ void masterTx_Control(conection_t *pcommand){
 
 	case INITIALIZATION:
 
-		if(pcommand->contSensor != 0){
+		if(pcommand->contSensor != ENABLECOUNTER){
 			if(initialize_secuence(pcommand->contSensor) == TRUE){
 				pcommand->mode = SKIPROMCOM;
 			}else{
@@ -601,11 +589,11 @@ void masterTx_Control(conection_t *pcommand){
 
 	case SKIPROMCOM:
 
-		if(pcommand->contSensor != 0){
+		if(pcommand->contSensor != ENABLECOUNTER ){
 			skip_Rom(pcommand->contSensor);
 		}
 
-		if(pcommand->contador_secuencia  == 1){
+		if(pcommand->contador_secuencia  == SEQUENCECOUNTER){
 			pcommand->mode = READSCRAT;
 			pcommand->contador_secuencia = 0;
 		}else{
@@ -616,7 +604,7 @@ void masterTx_Control(conection_t *pcommand){
 
 	case CONVERTTEMP:
 
-		if(pcommand->contSensor != 0){
+		if(pcommand->contSensor != ENABLECOUNTER){
 			send_byte(CONVERT_TEMP, pcommand->contSensor);
 			Conver_Temp(pcommand->contSensor);
 		}
@@ -632,28 +620,32 @@ void masterTx_Control(conection_t *pcommand){
 
 			delay(1000);
 
-			if(counter_record == 60){
-				//writeRegister(Buffer1, Buffer2, Buffer3);
-				printf("Se guardo la temperatura\r\n" );
+			if(counter_record == TIMESD){
+				writeRegister(Buffer1, Buffer2, Buffer3);
+				printf("Guarda las temperaturas en la memoria SD\r\n" );
 				counter_record = 0;
 				counter_Transfer++;
 			}else{
 				counter_record++;
 			}
 
-			if(counter_Transfer == 5){
+			if(counter_Transfer == TIMETX){
 
 				XBEE_TX(&pack, Buffer1, Buffer2, Buffer3);
-				printf("Se envio por radiofrecuencia la temperatura\r\n" );
+				printf("Envio de las temperaturas por radiofrecuencia al gateway\r\n" );
 				counter_Transfer = 0;
 			}
 
 		}
 
+
 		pcommand->contSensor++;
-		if(pcommand->contSensor == 4){
+
+		if(pcommand->contSensor == TOTALSENSOR){
 			pcommand->contSensor = 1;
 		}
+
+
 
 		pcommand->mode = INITIALIZATION;
 		break;

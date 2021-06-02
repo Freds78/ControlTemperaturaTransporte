@@ -23,8 +23,11 @@ extern "C" {
 #endif
 
 /*=====[Definition macros of public constants]===============================*/
-
-
+#define TIMESD 60
+#define TIMETX 3
+#define ENABLECOUNTER 0
+#define TOTALSENSOR 4
+#define SEQUENCECOUNTER 1
 /*=====[Public function-like macros]=========================================*/
 
 /*=====[Definitions of public data types]====================================*/

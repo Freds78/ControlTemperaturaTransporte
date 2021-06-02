@@ -10,9 +10,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "Record.h"
+#include "CardSD.h"
 #include "sim900.h"
 #include "sapi.h"
+
 
 /*=====[Definition macros of private constants]==============================*/
 
@@ -21,27 +22,13 @@
 /*=====[Definitions of public global variables]==============================*/
 
 /*=====[Definitions of private global variables]=============================*/
-#define DATARECEIVE_RX_SIZE	50
-#define VALUE_MAX_S1 20
-#define VALUE_MIN_S1 5
-#define VALUE_MAX_S2 25
-#define VALUE_MIN_S2 12
-#define VALUE_MAX_S3 28
-#define VALUE_MIN_S3 10
-#define VALUE_REPEAT 3
-#define AMARILLO LED1
-#define ROJO LED2
-#define VERDE LED3
 
 static uint8_t DataReceiveRx[DATARECEIVE_RX_SIZE];
 uint8_t indexBufferRx;
 uint8_t counterpass;
 uint8_t counterjump;
-uint8_t counterCallMsg1;
-uint8_t counterCallMsg2;
-uint8_t counterCallMsg3;
-float data1,data2,data3;
-
+uint8_t counterSD;
+uint8_t counterGSM;
 static rtc_t rtc;
 
 /*=====[Main function, program entry point after power on or reset]==========*/
@@ -112,7 +99,7 @@ static void data_separation(package_t *sec){
 		}
 
 	}
-	printf( "%s\t\n", sec->Sensor_Value1 );
+	//printf( "%s\t\n", sec->Sensor_Value1 );
 
 	for(k = 0 ; k < j ; k++){
 
@@ -127,7 +114,7 @@ static void data_separation(package_t *sec){
 		}
 
 	}
-	printf( "%s\t\n", sec->Sensor_Value2 );
+	//printf( "%s\t\n", sec->Sensor_Value2 );
 
 	for(k = 0 ; k < j ; k++){
 
@@ -142,7 +129,7 @@ static void data_separation(package_t *sec){
 		}
 
 	}
-	printf( "%s\t\n", sec->Sensor_Value3);
+	//printf( "%s\t\n", sec->Sensor_Value3);
 
 }
 
@@ -255,6 +242,7 @@ void onRx( void *noUsado){
 
 	if(indexBufferRx == 1 ){
 		counterpass = 1;
+		counterSD = 1;
 	}
 
 }
@@ -268,14 +256,21 @@ void Control_init(package_t *sec){
 	indexBufferRx = 0;
 	counterpass = 0;
 	counterjump = 0;
-	counterCallMsg1 = 0;
-	counterCallMsg2 = 0;
-	counterCallMsg3 = 0;
-	data1 = 0.0;
-	data2 = 0.0;
-	data3 = 0.0;
+	counterSD = 0;
+	counterGSM = 0;
+	sec->counterCallMsg1 = 0;
+	sec->counterCallMsg2 = 0;
+	sec->counterCallMsg3 = 0;
+	sec->data1 = 0.0;
+	sec->data2 = 0.0;
+	sec->data3 = 0.0;
+
+	sec->counter_clear1 = 0;
+	sec->counter_clear2 = 0;
+	sec->counter_clear3 = 0;
 
 
+	delayWrite(&sec->delay1sec,1000);
 
 	for(i = 0; i < DATARECEIVE_RX_SIZE; i++){
 		DataReceiveRx[i] = '\0';
@@ -315,10 +310,13 @@ void Control_data(package_t *sec){
 	switch(sec->mode){
 
 	case ESCAPED_CHARACTERS:
+
 		Escaped_Characters_Adequacy(sec);
 		sec->mode = VALIDATE;
 		break;
+
 	case VALIDATE:
+
 		if(Package_ChecksumRx(sec)){
 			//printf("El paquete se recibio de forma correcta\n");
 			sec->mode = ADECUACY;
@@ -327,142 +325,180 @@ void Control_data(package_t *sec){
 			sec->mode = ESCAPED_CHARACTERS;
 		}
 		break;
+
 	case ADECUACY:										// adecuamos el dato
+
 		data_separation(sec);
 		sec->mode = RECORD;
 		break;
+
 	case RECORD:										// Guardamos el dato
 
-		data1 = stringToFloat(sec->Sensor_Value1);
-		data2 = stringToFloat(sec->Sensor_Value2);
-		data3 = stringToFloat(sec->Sensor_Value3);
-		//writeRegister(data1, data2, data3);
-		printf("Guarde los datos en la tarjeta\n");
+		sec->data1 = stringToFloat(sec->Sensor_Value1);
+		sec->data2 = stringToFloat(sec->Sensor_Value2);
+		sec->data3 = stringToFloat(sec->Sensor_Value3);
+
+
+		if(counterSD == TIMERECORD){
+			writeRegisterGateway(sec->data1, sec->data2, sec->data3);
+			printf("Sensor_1: %3.1f\t\n", sec->data1);
+			printf("Sensor_2: %3.1f\t\n", sec->data2);
+			printf("Sensor_3: %3.1f\t\n", sec->data3);
+
+			printf("Guarda los datos en la tarjeta de memoria SD\n");
+			counterGSM++;
+			counterSD = 0;
+		}
 
 		sec->mode = TRANSMIT;
 
 		break;
+
 	case TRANSMIT:
-		printf("Transmitimos por sim900 a la nube\n");
-		GPRS_Sim900(data1,data2,data3);
-		if(data1 > VALUE_MAX_S1){
-			while(counterCallMsg1 != VALUE_REPEAT){
-				CALL_Sim900();
-				MSG_S1_Sim900(data1);
-				turnOn(AMARILLO);
-				printf("Llamamos y enviamos mensaje sensor 1\n");
-				counterCallMsg1++;
-			}
-			turnOn(AMARILLO);
-			//delayWrite(&sec->delay1,10000);
-			//if(delayRead(&sec->delay1)){
-			//counterCallMsg1 = 0;
 
-			//}
-
-		}else{
-			counterCallMsg1 = 0;
-			turnOff(AMARILLO);
+		if(counterGSM == TIMESEND){
+			printf("Transmite via GSM/GPRS desde el sim900 al servidor de ADOX\n");
+			GPRS_Sim900(sec->data1,sec->data2,sec->data3);
+			counterGSM = 0;
 		}
 
-		if(data1 < VALUE_MIN_S1){
-			while(counterCallMsg1 != VALUE_REPEAT){
-				CALL_Sim900();
-				MSG_S1_Sim900(data1);
-				turnOn(AMARILLO);
-				printf("Llamamos y enviamos mensaje sensor 1\n");
-				counterCallMsg1++;
-			}
-			turnOn(AMARILLO);
-			//delayWrite(&sec->delay1,10000);
-			//if(delayRead(&sec->delay1)){
-			//	counterCallMsg1 = 0;
-			//}
+		sec->mode = CALLSMS;
 
-		}else{
-			counterCallMsg1 = 0;
-			turnOff(AMARILLO);
-		}
+		break;
 
-		if(data2 > VALUE_MAX_S2){
-			while(counterCallMsg2 != VALUE_REPEAT){
-				CALL_Sim900();
-				MSG_S2_Sim900(data2);
-				turnOn(ROJO);
-				printf("Llamamos y enviamos mensaje sensor 2\n");
-				counterCallMsg2++;
-			}
-			turnOn(ROJO);
-			//delayWrite(&sec->delay2,10000);
-			//if(delayRead(&sec->delay2)){
-			//	counterCallMsg2 = 0;
-			//}
-		}else{
-			counterCallMsg2 = 0;
-			turnOff(ROJO);
-		}
+	case CALLSMS:
 
-		if( data2 < VALUE_MIN_S2){
-			while(counterCallMsg2 != VALUE_REPEAT){
+		if(delayRead(&sec->delay1sec)){
+			if(sec->data1 > VALUE_MAX_S1){
+				while(sec->counterCallMsg1 != VALUE_REPEAT){
 					CALL_Sim900();
-					MSG_S2_Sim900(data2);
+					MSG_S1_Sim900(sec->data1);
+					turnOn(AMARILLO);
+					printf("Llama y envia mensaje de la medicion del sensor 1\n");
+					sec->counterCallMsg1++;
+				}
+				turnOn(AMARILLO);
+
+				if(sec->counter_clear1 == TIMEDELAY){
+					sec->counterCallMsg1 = 0;
+					sec->counter_clear1 = 0;
+				}
+
+				sec->counter_clear1++;
+
+
+			}else if(sec->data1 < VALUE_MIN_S1){
+				while(sec->counterCallMsg1 != VALUE_REPEAT){
+					CALL_Sim900();
+					MSG_S1_Sim900(sec->data1);
+					turnOn(AMARILLO);
+					printf("Llama y envia mensaje de la medicion del sensor 1\n");
+					sec->counterCallMsg1++;
+				}
+				turnOn(AMARILLO);
+
+				if(sec->counter_clear1 == TIMEDELAY){
+					sec->counterCallMsg1 = 0;
+					sec->counter_clear1 = 0;
+				}
+
+				sec->counter_clear1++;
+
+
+			}else{
+				sec->counterCallMsg1 = 0;
+				turnOff(AMARILLO);
+			}
+
+			if(sec->data2 > VALUE_MAX_S2){
+				while(sec->counterCallMsg2 != VALUE_REPEAT){
+					CALL_Sim900();
+					MSG_S2_Sim900(sec->data2);
 					turnOn(ROJO);
-					printf("Llamamos y enviamos mensaje sensor 2\n");
-					counterCallMsg2++;
+					printf("Llama y envia mensaje de la medicion del sensor 2\n");
+					sec->counterCallMsg2++;
+				}
+				turnOn(ROJO);
+
+				if(sec->counter_clear2 == TIMEDELAY){
+					sec->counterCallMsg2 = 0;
+					sec->counter_clear2 = 0;
+				}
+
+				sec->counter_clear2++;
+
+
+			}else if( sec->data2 < VALUE_MIN_S2){
+				while(sec->counterCallMsg2 != VALUE_REPEAT){
+					CALL_Sim900();
+					MSG_S2_Sim900(sec->data2);
+					turnOn(ROJO);
+					printf("Llama y envia mensaje de la medicion del sensor 2\n");
+					sec->counterCallMsg2++;
+				}
+				turnOn(ROJO);
+
+				if(sec->counter_clear2 == TIMEDELAY){
+					sec->counterCallMsg2 = 0;
+					sec->counter_clear2 = 0;
+				}
+
+				sec->counter_clear2++;
+
+			}else{
+				sec->counterCallMsg2 = 0;
+				turnOff(ROJO);
 			}
-			turnOn(ROJO);
-			//delayWrite(&sec->delay2,10000);
-			//if(delayRead(&sec->delay2)){
-			//	counterCallMsg2 = 0;
-			//}
 
-		}else{
-			counterCallMsg2 = 0;
-			turnOff(ROJO);
-		}
-
-		if(data3 > VALUE_MAX_S3){
-			while(counterCallMsg3 != VALUE_REPEAT){
-				CALL_Sim900();
-				MSG_S3_Sim900(data3);
-				counterCallMsg3++;
+			if(sec->data3 > VALUE_MAX_S3){
+				while(sec->counterCallMsg3 != VALUE_REPEAT){
+					CALL_Sim900();
+					MSG_S3_Sim900(sec->data3);
+					sec->counterCallMsg3++;
+					turnOn(VERDE);
+					printf("Llama y envia mensaje de la medicion del sensor 3\n");
+				}
 				turnOn(VERDE);
-				printf("Llamamos y enviamos mensaje sensor 3\n");
-			}
-			turnOn(VERDE);
-			//delayWrite(&sec->delay3,10000);
-		//	if(delayRead(&sec->delay3)){
-		//		counterCallMsg3 = 0;
-		//	}
 
-		}else{
-			counterCallMsg3 = 0;
-			turnOff(VERDE);
-		}
+				if(sec->counter_clear3 == TIMEDELAY){
+					sec->counterCallMsg3 = 0;
+					sec->counter_clear3 = 0;
+				}
 
-		if(data3 < VALUE_MIN_S3){
-			while(counterCallMsg3 != VALUE_REPEAT){
-				CALL_Sim900();
-				MSG_S3_Sim900(data3);
-				counterCallMsg3++;
+				sec->counter_clear3++;
+
+			}else if(sec->data3 < VALUE_MIN_S3){
+				while(sec->counterCallMsg3 != VALUE_REPEAT){
+					CALL_Sim900();
+					MSG_S3_Sim900(sec->data3);
+					sec->counterCallMsg3++;
+					turnOn(VERDE);
+					printf("Llama y envia mensaje de la medicion del sensor 3\n");
+				}
 				turnOn(VERDE);
-				printf("Llamamos y enviamos mensaje sensor 3\n");
-			}
-			turnOn(VERDE);
-			//delayWrite(&sec->delay3,10000);
-			//if(delayRead(&sec->delay3)){
-			//	counterCallMsg3 = 0;
-			//}
 
-		}else{
-			counterCallMsg3 = 0;
-			turnOff(VERDE);
+				if(sec->counter_clear3 == TIMEDELAY){
+					sec->counterCallMsg3 = 0;
+					sec->counter_clear3 = 0;
+				}
+
+				sec->counter_clear3++;
+
+			}else{
+				sec->counterCallMsg3 = 0;
+				turnOff(VERDE);
+			}
+
 		}
+
 		sec->mode = ESCAPED_CHARACTERS;
 		break;
+
 	default:
+
 		sec->mode = ESCAPED_CHARACTERS;
 		break;
 
 	}
+
 }

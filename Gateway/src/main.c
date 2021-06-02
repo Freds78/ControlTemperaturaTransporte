@@ -7,7 +7,7 @@
 
 #include "sapi.h"
 #include "Control_data.h"
-#include "Record.h"
+#include "CardSD.h"
 #include "ff.h"       // <= Biblioteca FAT FS
 #include "fssdc.h"	// API de bajo nivel para unidad "SDC:" en FAT FS
 

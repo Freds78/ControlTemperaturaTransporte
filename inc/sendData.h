@@ -50,6 +50,21 @@
 #define counterDt 30
 #define place_checksum 3
 #define byte_Nocounter 4
+#define AMARILLO LED1
+#define ROJO LED2
+#define VERDE LED3
+#define SKIP_ROMCOM 0xCC
+#define CONVERT_TEMP 0x44
+#define READ_SCRATCH 0xBE
+#define SEARCH_ROM 0xF0
+#define MATCH_ROM 0x55
+#define VALUE_HIGH_S1 20
+#define VALUE_LOW_S1 15
+#define VALUE_HIGH_S2 25
+#define VALUE_LOW_S2 12
+#define VALUE_HIGH_S3 28
+#define VALUE_LOW_S3 10
+
 /*=====[Public function-like macros]=========================================*/
 
 /*=====[Definitions of public data types]====================================*/

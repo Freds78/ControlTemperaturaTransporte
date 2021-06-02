@@ -248,7 +248,7 @@ void XBEE_TX(packet_t *pack, float Buffer1, float Buffer2, float Buffer3){
 		//El paquete se creo de forma correcta
 		Escaped_Characters_Adequacy(pack);
 		PackageTx(pack);
-		printf("Transmiti el paquete\r\n" );
+		//printf("Transmite el paquete\r\n" );
 	}
 
 }

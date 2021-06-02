@@ -27,7 +27,20 @@ extern "C" {
 #define DATA_SIZE 50
 #define RFDATA_SIZE	10
 #define SENSOR_VALUE_SIZE 8
-
+#define DATARECEIVE_RX_SIZE	50
+#define TIMERECORD 1
+#define TIMESEND 1
+#define TIMEDELAY 60
+#define VALUE_MAX_S1 20
+#define VALUE_MIN_S1 5
+#define VALUE_MAX_S2 25
+#define VALUE_MIN_S2 12
+#define VALUE_MAX_S3 28
+#define VALUE_MIN_S3 10
+#define VALUE_REPEAT 2
+#define AMARILLO LED1
+#define ROJO LED2
+#define VERDE LED3
 
 
 
@@ -42,12 +55,20 @@ typedef enum{
 	ADECUACY,
 	RECORD,
 	TRANSMIT,
+	CALLSMS,
 }sequence_t;
 
 typedef struct{
-	delay_t delay1;
-	delay_t delay2;
-	delay_t delay3;
+	uint8_t counter_clear1;
+	uint8_t counter_clear2;
+	uint8_t counter_clear3;
+	delay_t delay1sec;
+	uint8_t counterCallMsg1;
+	uint8_t counterCallMsg2;
+	uint8_t counterCallMsg3;
+	float data1;
+	float data2;
+	float data3;
 	sequence_t mode;
 	uint8_t DataReceive[DATA_RX_SIZE];
 	uint8_t counterReceive;
@@ -62,7 +83,7 @@ typedef struct{
 void onRx( void *noUsado);
 void Control_init(package_t *sec);
 void Control_data(package_t *sec);
-
+void diskTickHook( void *ptr );
 /*=====[C++ - end]===========================================================*/
 
 #ifdef __cplusplus
